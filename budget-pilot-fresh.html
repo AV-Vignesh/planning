@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0F0C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Budget">
+<title>Budget Pilot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0B0F0C; --surface:#131A15; --surface2:#1A231D; --border:rgba(255,255,255,.07);
+  --ink:#EDF3EE; --muted:#8FA096; --dim:#5C6B62;
+  --mint:#4ADE80; --mint-dim:rgba(74,222,128,.14);
+  --amber:#F5B54A; --amber-dim:rgba(245,181,74,.14);
+  --red:#F87171; --red-dim:rgba(248,113,113,.13);
+  --blue:#7DB8F0;
+  --radius:16px;
+  --on-accent:#08130C;
+  --nav:rgba(11,15,12,.92);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
+}
+/* ---------- themes ---------- */
+body[data-theme="oled"]{--bg:#000;--surface:#0C0C0C;--surface2:#161616;--border:rgba(255,255,255,.1);--nav:rgba(0,0,0,.92)}
+body[data-theme="ocean"]{--bg:#0A0F1A;--surface:#111827;--surface2:#1B2536;--border:rgba(255,255,255,.08);--mint:#6EB7FF;--mint-dim:rgba(110,183,255,.14);--nav:rgba(10,15,26,.92)}
+body[data-theme="light"]{--bg:#F3F5F2;--surface:#FFFFFF;--surface2:#EAEEE9;--border:rgba(0,0,0,.09);
+  --ink:#182119;--muted:#5A6A5F;--dim:#93A398;--mint:#0B8F52;--mint-dim:rgba(11,143,82,.11);
+  --amber:#A5700D;--amber-dim:rgba(165,112,13,.12);--red:#C63B3B;--red-dim:rgba(198,59,59,.1);
+  --blue:#2467B0;--on-accent:#FFFFFF;--nav:rgba(243,245,242,.92)}
+/* ---------- compact density ---------- */
+body[data-compact="1"] .hero .big{font-size:34px;margin-bottom:8px}
+body[data-compact="1"] .item{padding:9px 12px;min-height:46px}
+body[data-compact="1"] .item .ic{width:30px;height:30px;border-radius:10px}
+body[data-compact="1"] .item .nm{font-size:14px}
+body[data-compact="1"] .stat{padding:7px 10px}
+body[data-compact="1"] .stat .v{font-size:15px}
+body[data-compact="1"] .section{padding:11px 14px 0}
+body[data-compact="1"] .statrow{padding:11px 14px 0}
+body[data-compact="1"] .hero{padding:6px 14px 0}
+body[data-compact="1"] .btn{padding:12px;min-height:46px}
+body[data-compact="1"] .row-plain{padding:10px 12px;min-height:46px;font-size:14px}
+body[data-compact="1"] .pcard{padding:12px}
+body[data-compact="1"] .prow{padding:6px 0;font-size:13px}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{font-size:16px}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:'Space Grotesk',-apple-system,system-ui,sans-serif;
+  min-height:100dvh; padding-bottom:calc(76px + var(--safe-b));
+  overscroll-behavior-y:none;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit;font-size:16px}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+
+/* ---------- header ---------- */
+header{padding:calc(14px + var(--safe-t)) 18px 6px;display:flex;justify-content:space-between;align-items:center}
+header h1{font-size:15px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+#monthPill{font-size:13px;font-weight:600;background:var(--surface);border:1px solid var(--border);padding:6px 12px;border-radius:99px;color:var(--ink)}
+
+/* ---------- hero balance ---------- */
+.hero{padding:10px 18px 4px}
+.hero .lbl{font-size:12px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.hero .big{font-size:44px;font-weight:700;line-height:1.1;margin:2px 0 10px}
+.hero .big small{font-size:22px;color:var(--muted);font-weight:500}
+.segbar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--surface2)}
+.segbar div{height:100%}
+.seg-legend{display:flex;gap:14px;margin-top:8px;flex-wrap:wrap}
+.seg-legend span{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.dot{width:8px;height:8px;border-radius:99px;display:inline-block}
+.statrow{display:flex;gap:10px;padding:14px 18px 4px}
+.stat{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px}
+.stat .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.stat .v{font-size:17px;font-weight:600;margin-top:2px}
+
+/* ---------- sections & items ---------- */
+.section{padding:16px 18px 0}
+.section h2{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.section h2 .cnt{color:var(--dim);font-weight:500}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.item{display:flex;align-items:center;gap:12px;padding:14px;min-height:56px;width:100%;text-align:left;border-bottom:1px solid var(--border);transition:background .15s}
+.item:last-child{border-bottom:none}
+.item:active{background:var(--surface2)}
+.item .ic{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.item .mid{flex:1;min-width:0}
+.item .nm{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .sub{font-size:12px;color:var(--muted);margin-top:1px}
+.item .amt{font-size:15px;font-weight:600;text-align:right}
+.item .amt .was{display:block;font-size:11px;color:var(--dim);text-decoration:line-through;font-weight:400}
+.tag{font-size:10px;padding:2px 7px;border-radius:99px;font-weight:600;letter-spacing:.03em}
+.tag.carry{background:var(--amber-dim);color:var(--amber)}
+.tag.fixed{background:rgba(125,184,240,.12);color:var(--blue)}
+.tag.vari{background:var(--mint-dim);color:var(--mint)}
+.tag.once{background:rgba(255,255,255,.08);color:var(--muted)}
+.done .nm{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim)}
+.empty{padding:26px 16px;text-align:center;color:var(--dim);font-size:14px}
+
+/* ---------- warnings ---------- */
+.warn{display:flex;gap:10px;background:var(--amber-dim);border:1px solid rgba(245,181,74,.25);border-radius:var(--radius);padding:12px 14px;font-size:13px;color:var(--amber);line-height:1.45;margin-bottom:10px}
+.warn.red{background:var(--red-dim);border-color:rgba(248,113,113,.25);color:var(--red)}
+.warn.blue{background:rgba(125,184,240,.1);border-color:rgba(125,184,240,.25);color:var(--blue)}
+
+/* ---------- buttons ---------- */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:14px;font-size:15px;font-weight:600;transition:transform .1s,opacity .15s;min-height:50px}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--mint);color:var(--on-accent)}
+.btn.ghost{background:var(--surface);border:1px solid var(--border);color:var(--ink)}
+.btn.danger{background:var(--red-dim);color:var(--red)}
+.btn.warn-b{background:var(--amber-dim);color:var(--amber)}
+.btn.sm{padding:10px 14px;font-size:13px;min-height:40px;width:auto}
+.btnrow{display:flex;gap:10px}
+.btnrow .btn{flex:1}
+
+/* ---------- tab bar ---------- */
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--nav);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-top:1px solid var(--border);display:flex;padding:8px 8px calc(8px + var(--safe-b));z-index:40}
+nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0;font-size:11px;font-weight:500;color:var(--dim);border-radius:12px;min-height:48px}
+nav button.on{color:var(--mint)}
+nav svg{width:22px;height:22px}
+
+/* ---------- FAB ---------- */
+#fab{position:fixed;right:18px;bottom:calc(84px + var(--safe-b));width:54px;height:54px;border-radius:99px;background:var(--mint);color:var(--on-accent);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(74,222,128,.35);z-index:39;transition:transform .12s}
+#fab:active{transform:scale(.92)}
+#fab svg{width:26px;height:26px}
+
+/* ---------- bottom sheet ---------- */
+#scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;opacity:0;pointer-events:none;transition:opacity .2s}
+#scrim.show{opacity:1;pointer-events:auto}
+#sheet{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-radius:22px 22px 0 0;border-top:1px solid var(--border);z-index:51;transform:translateY(105%);transition:transform .26s cubic-bezier(.32,.72,.25,1);padding:10px 18px calc(20px + var(--safe-b));max-height:88dvh;overflow-y:auto}
+#sheet.show{transform:translateY(0)}
+.grab{width:38px;height:4px;border-radius:99px;background:var(--dim);margin:2px auto 14px;opacity:.5}
+.sh-title{font-size:19px;font-weight:700;margin-bottom:2px}
+.sh-sub{font-size:13px;color:var(--muted);margin-bottom:16px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.field input,.field select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:13px 14px;color:var(--ink);outline:none;appearance:none}
+.field input:focus,.field select:focus{border-color:var(--mint)}
+.chips{display:flex;gap:8px}
+.chip{flex:1;padding:11px 6px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);font-size:13px;font-weight:600;color:var(--muted);text-align:center;min-height:44px}
+.chip.on{background:var(--mint-dim);border-color:var(--mint);color:var(--mint)}
+.sheet-actions{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+.spacer{height:8px}
+
+/* ---------- predict / dashboard ---------- */
+.pcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.pcard .t{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.prow{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px}
+.prow:last-child{border-bottom:none}
+.prow .l{color:var(--muted)}
+.prow .r{font-weight:600}
+.prow.total .l,.prow.total .r{color:var(--ink);font-size:15px;font-weight:700}
+.bar-wrap{margin:9px 0}
+.bar-lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px}
+.bar{height:9px;border-radius:99px;background:var(--surface2);overflow:hidden;display:flex}
+.bar i{height:100%;display:block}
+.ai-out{white-space:pre-wrap;font-size:14px;line-height:1.55;color:var(--ink);background:var(--surface2);border-radius:12px;padding:14px;margin-top:10px}
+
+.list-plain{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+.row-plain{display:flex;justify-content:space-between;align-items:center;padding:14px;border-bottom:1px solid var(--border);width:100%;text-align:left;font-size:15px;min-height:52px}
+.row-plain:last-child{border-bottom:none}
+.row-plain .r{color:var(--muted);font-size:13px;display:flex;align-items:center;gap:6px}
+.toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);bottom:calc(90px + var(--safe-b));background:var(--ink);color:var(--bg);font-size:13px;font-weight:600;padding:10px 18px;border-radius:99px;z-index:60;opacity:0;transition:all .25s;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.hint{font-size:12px;color:var(--dim);line-height:1.5;margin-top:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="appTitle">Budget Pilot</h1>
+  <button id="monthPill"></button>
+</header>
+
+<main id="view"></main>
+
+<button id="fab" aria-label="Add item">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+
+<nav>
+  <button data-tab="month" class="on" aria-label="This month">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+    Month
+  </button>
+  <button data-tab="predict" aria-label="Prediction">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 6-8"/><path d="M15 7h4v4"/></svg>
+    Predict
+  </button>
+  <button data-tab="more" aria-label="More">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+    More
+  </button>
+</nav>
+
+<div id="scrim"></div>
+<div id="sheet" role="dialog" aria-modal="true"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= state ================= */
+const KEY='budgetpilot_v2';
+let S = load();
+function load(){
+  try{ const d=JSON.parse(localStorage.getItem(KEY));
+    if(d&&d.months){ if(!d.settings.ui) d.settings.ui={theme:'mint',density:'comfortable'}; return d; } }catch(e){}
+  return { settings:{salaryDefault:null,lastExport:null,ui:{theme:'mint',density:'comfortable'},aoai:{endpoint:'',key:'',deployment:'',ver:'2024-06-01'}}, templates:[], months:{} };
+}
+function save(){ localStorage.setItem(KEY,JSON.stringify(S)); }
+const uid=()=>Math.random().toString(36).slice(2,9);
+
+/* ================= date helpers ================= */
+const now=new Date();
+function mk(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+const curKey=mk(now);
+function nextKey(k){ let[y,m]=k.split('-').map(Number); m++; if(m>12){m=1;y++;} return y+'-'+String(m).padStart(2,'0'); }
+function prevKey(k){ let[y,m]=k.split('-').map(Number); m--; if(m<1){m=12;y--;} return y+'-'+String(m).padStart(2,'0'); }
+const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function label(k){ const[y,m]=k.split('-'); return MN[+m-1]+' '+y; }
+
+/* ================= money ================= */
+const inr=new Intl.NumberFormat('en-IN',{maximumFractionDigits:0});
+const fmt=n=>'₹'+inr.format(Math.round(n||0));
+
+/* ================= view state ================= */
+let tab='month';
+let activeMonth = S.months[curKey] ? curKey : (Object.keys(S.months).sort().pop() || curKey);
+
+/* ================= core calcs ================= */
+function monthData(k){ return S.months[k]; }
+function sums(m){
+  let closed=0, pending=0, dropped=0;
+  m.items.forEach(it=>{
+    if(it.status==='closed') closed+= (it.actual!=null?it.actual:it.budget);
+    else if(it.status==='planned'||it.status==='carried_in') pending+=it.budget;
+    else if(it.status==='dropped') dropped+=it.budget;
+  });
+  return {closed,pending,dropped, free:(m.salary||0)-closed-pending};
+}
+function historyActuals(name){ // last closed actuals for an item name across months (oldest→newest)
+  const keys=Object.keys(S.months).sort();
+  const out=[];
+  keys.forEach(k=>{ S.months[k].items.forEach(it=>{ if(it.name.toLowerCase()===name.toLowerCase() && it.status==='closed') out.push(it.actual!=null?it.actual:it.budget); }); });
+  return out;
+}
+function predictAmount(t){
+  if(t.type==='fixed') return {amt:t.budget,how:'fixed'};
+  const h=historyActuals(t.name).slice(-3);
+  if(h.length===0) return {amt:t.budget,how:'budget'};
+  const avg=h.reduce((a,b)=>a+b,0)/h.length;
+  return {amt:Math.round(avg),how:'avg of last '+h.length};
+}
+function carryCandidates(){ // pending items from active month that will roll to next
+  const m=monthData(activeMonth); if(!m) return [];
+  return m.items.filter(it=>it.status==='planned'||it.status==='carried_in');
+}
+function chronicCarries(){
+  const out=[]; const m=monthData(activeMonth); if(!m) return out;
+  m.items.forEach(it=>{ if((it.carryCount||0)>=2 && it.status!=='closed' && it.status!=='dropped') out.push(it); });
+  return out;
+}
+function overrunTemplates(){
+  const out=[];
+  S.templates.filter(t=>t.active&&t.type==='variable').forEach(t=>{
+    const h=historyActuals(t.name).slice(-3);
+    if(h.length>=2){ const avg=h.reduce((a,b)=>a+b,0)/h.length;
+      if(avg>t.budget*1.1) out.push({name:t.name,budget:t.budget,avg:Math.round(avg)});
+    }
+  });
+  return out;
+}
+
+/* ================= actions ================= */
+function startMonth(k,salary){
+  const items=[];
+  // carry pending from previous existing month
+  const pk=Object.keys(S.months).filter(x=>x<k).sort().pop();
+  if(pk){
+    S.months[pk].items.forEach(it=>{
+      if(it.status==='planned'||it.status==='carried_in'){
+        it.status='carried_out';
+        items.push({id:uid(),name:it.name,type:it.type,budget:it.budget,actual:null,status:'carried_in',carryCount:(it.carryCount||0)+1,from:pk});
+      }
+    });
+  }
+  // templates
+  S.templates.filter(t=>t.active).forEach(t=>{
+    if(!items.some(x=>x.name.toLowerCase()===t.name.toLowerCase()))
+      items.push({id:uid(),name:t.name,type:t.type,budget:t.budget,actual:null,status:'planned',carryCount:0,tid:t.id});
+  });
+  // pre-added one-times for this month
+  if(S.months[k] && S.months[k].preItems){ S.months[k].preItems.forEach(p=>items.push(p)); }
+  S.months[k]={salary:salary,items:items,startedAt:Date.now()};
+  S.settings.salaryDefault=salary;
+  activeMonth=k; save(); render();
+  toast(label(k)+' started · '+items.length+' items');
+}
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1900); }
+
+/* ================= sheet ================= */
+const scrim=document.getElementById('scrim'), sheet=document.getElementById('sheet');
+function openSheet(html){ sheet.innerHTML='<div class="grab"></div>'+html; sheet.classList.add('show'); scrim.classList.add('show'); }
+function closeSheet(){ sheet.classList.remove('show'); scrim.classList.remove('show'); }
+scrim.onclick=closeSheet;
+
+/* ---- item sheet ---- */
+function itemSheet(id){
+  const m=monthData(activeMonth); const it=m.items.find(x=>x.id===id); if(!it) return;
+  const carried=it.status==='carried_in'? '<span class="tag carry">carried ×'+it.carryCount+'</span> ':'';
+  const isOpen=it.status==='planned'||it.status==='carried_in';
+  openSheet(`
+    <div class="sh-title">${esc(it.name)}</div>
+    <div class="sh-sub">${carried}Budget ${fmt(it.budget)} · ${it.type}</div>
+    ${isOpen?`
+    <div class="field"><label>Actual amount paid</label>
+      <input id="actAmt" type="number" inputmode="numeric" value="${it.budget}"></div>
+    <div class="sheet-actions">
+      <button class="btn primary" onclick="doClose('${id}')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+        Mark closed</button>
+      <div class="btnrow">
+        <button class="btn warn-b" onclick="doCarry('${id}')">Carry forward</button>
+        <button class="btn danger" onclick="doDrop('${id}')">Drop</button>
+      </div>
+      <button class="btn ghost" onclick="editSheet('${id}')">Edit</button>
+    </div>`:`
+    <div class="sheet-actions">
+      <button class="btn ghost" onclick="doReopen('${id}')">Re-open</button>
+      <button class="btn danger" onclick="doDelete('${id}')">Delete</button>
+    </div>`}
+  `);
+  const a=document.getElementById('actAmt'); if(a){a.focus();a.select();}
+}
+function doClose(id){ const m=monthData(activeMonth); const it=m.items.find(x=>x.id===id);
+  const v=parseFloat(document.getElementById('actAmt').value); it.actual=isNaN(v)?it.budget:v; it.status='closed'; it.closedAt=Date.now();
+  save(); closeSheet(); render(); toast(esc(it.name)+' closed · '+fmt(it.actual)); }
+function doCarry(id){ const m=monthData(activeMonth); const it=m.items.find(x=>x.id===id);
+  it.status='carried_in'; it.carryCount=(it.carryCount||0); // stays pending, will roll on next start
+  save(); closeSheet(); render(); toast('Will carry to next month'); }
+function doDrop(id){ const m=monthData(activeMonth); const it=m.items.find(x=>x.id===id); it.status='dropped'; save(); closeSheet(); render(); toast('Dropped'); }
+function doReopen(id){ const m=monthData(activeMonth); const it=m.items.find(x=>x.id===id); it.status='planned'; it.actual=null; save(); closeSheet(); render(); }
+function doDelete(id){ const m=monthData(activeMonth); m.items=m.items.filter(x=>x.id!==id); save(); closeSheet(); render(); toast('Deleted'); }
+
+/* ---- add / edit ---- */
+let pickedType='variable';
+function addSheet(){
+  pickedType='variable';
+  openSheet(`
+    <div class="sh-title">Add item</div>
+    <div class="sh-sub">Goes into ${label(activeMonth)}</div>
+    <div class="field"><label>Name</label><input id="f_nm" placeholder="e.g. Groceries" autocomplete="off"></div>
+    <div class="field"><label>Budget amount</label><input id="f_amt" type="number" inputmode="numeric" placeholder="0"></div>
+    <div class="field"><label>Type</label>
+      <div class="chips">
+        <button class="chip" data-t="fixed" onclick="pick(this)">Fixed</button>
+        <button class="chip on" data-t="variable" onclick="pick(this)">Variable</button>
+        <button class="chip" data-t="onetime" onclick="pick(this)">One-time</button>
+      </div>
+      <div class="hint">Fixed & Variable repeat every month (saved as template). One-time is just for this month.</div>
+    </div>
+    <button class="btn primary" onclick="doAdd()">Add</button>
+  `);
+  document.getElementById('f_nm').focus();
+}
+function pick(el){ document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); pickedType=el.dataset.t; }
+function doAdd(){
+  const nm=document.getElementById('f_nm').value.trim(); const amt=parseFloat(document.getElementById('f_amt').value);
+  if(!nm||isNaN(amt)||amt<=0){ toast('Name & amount needed'); return; }
+  let m=monthData(activeMonth);
+  if(!m){ toast('Start the month first'); closeSheet(); return; }
+  const it={id:uid(),name:nm,type:pickedType,budget:amt,actual:null,status:'planned',carryCount:0};
+  if(pickedType!=='onetime'){ const t={id:uid(),name:nm,type:pickedType,budget:amt,active:true}; S.templates.push(t); it.tid=t.id; }
+  m.items.push(it); save(); closeSheet(); render(); toast(nm+' added');
+}
+function editSheet(id){
+  const m=monthData(activeMonth); const it=m.items.find(x=>x.id===id);
+  openSheet(`
+    <div class="sh-title">Edit item</div><div class="spacer"></div>
+    <div class="field"><label>Name</label><input id="e_nm" value="${esc(it.name)}"></div>
+    <div class="field"><label>Budget amount</label><input id="e_amt" type="number" inputmode="numeric" value="${it.budget}"></div>
+    <button class="btn primary" onclick="doEdit('${id}')">Save</button>
+  `);
+}
+function doEdit(id){
+  const m=monthData(activeMonth); const it=m.items.find(x=>x.id===id);
+  const nm=document.getElementById('e_nm').value.trim(); const amt=parseFloat(document.getElementById('e_amt').value);
+  if(nm) it.name=nm; if(!isNaN(amt)&&amt>0) it.budget=amt;
+  const t=S.templates.find(x=>x.id===it.tid); if(t){ t.name=it.name; t.budget=it.budget; }
+  save(); closeSheet(); render();
+}
+
+/* ---- set salary for existing month ---- */
+function salarySheet(){
+  openSheet(`
+    <div class="sh-title">Salary · ${label(activeMonth)}</div><div class="spacer"></div>
+    <div class="field"><label>Amount credited (₹)</label>
+      <input id="salX" type="number" inputmode="numeric" value="${S.settings.salaryDefault||''}" placeholder="e.g. 100000"></div>
+    <button class="btn primary" onclick="doSalary()">Save</button>`);
+  const s=document.getElementById('salX'); s.focus(); s.select();
+}
+function doSalary(){
+  const v=parseFloat(document.getElementById('salX').value);
+  if(isNaN(v)||v<=0){ toast('Enter amount'); return; }
+  monthData(activeMonth).salary=v;
+  const latest=Object.keys(S.months).sort().pop();
+  if(activeMonth===latest) S.settings.salaryDefault=v;
+  save(); closeSheet(); render(); toast('Salary set · '+fmt(v));
+}
+
+/* ---- start month sheet ---- */
+function startSheet(k){
+  const def=S.settings.salaryDefault||'';
+  const carries=carryCandidates();
+  openSheet(`
+    <div class="sh-title">Start ${label(k)}</div>
+    <div class="sh-sub">${S.templates.filter(t=>t.active).length} recurring items${carries.length? ' + '+carries.length+' carry-forward':''} will be loaded</div>
+    <div class="field"><label>Salary credited (₹)</label>
+      <input id="sal" type="number" inputmode="numeric" value="${def}" placeholder="e.g. 100000"></div>
+    <button class="btn primary" onclick="confirmStart('${k}')">Start month</button>
+  `);
+  const s=document.getElementById('sal'); s.focus(); s.select();
+}
+function confirmStart(k){
+  const v=parseFloat(document.getElementById('sal').value);
+  if(isNaN(v)||v<=0){ toast('Enter salary'); return; }
+  closeSheet(); startMonth(k,v);
+}
+
+/* ================= renders ================= */
+const view=document.getElementById('view');
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function render(){
+  document.getElementById('monthPill').textContent=label(activeMonth);
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  document.getElementById('fab').style.display=(tab==='month'&&monthData(activeMonth))?'flex':'none';
+  if(tab==='month') renderMonth();
+  else if(tab==='predict') renderPredict();
+  else renderMore();
+  window.scrollTo(0,0);
+}
+
+function renderMonth(){
+  const m=monthData(activeMonth);
+  if(!m){
+    const hasTpl=S.templates.length>0;
+    view.innerHTML=`
+      <div class="section" style="padding-top:40px">
+        <div class="pcard" style="text-align:center;padding:30px 20px">
+          <div style="font-size:38px;margin-bottom:10px">🌱</div>
+          <div style="font-size:18px;font-weight:700;margin-bottom:6px">${label(activeMonth)} not started</div>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.5">
+            ${hasTpl? 'Salary came? Start the month and your list loads automatically.' : 'First add your regular items (EMI, savings, groceries…) — they become your monthly template.'}</div>
+          ${hasTpl? `<button class="btn primary" onclick="startSheet('${activeMonth}')">Salary credited → Start</button>`
+                  : `<div class="sheet-actions"><button class="btn primary" onclick="firstSetup()">Set up my list</button>
+                     <button class="btn ghost" onclick="importSheet()">Import a backup</button></div>`}
+        </div>
+        ${hasTpl?`<div class="hint" style="text-align:center">Templates: ${S.templates.filter(t=>t.active).length} items · ${fmt(S.templates.filter(t=>t.active).reduce((a,t)=>a+t.budget,0))} total</div>`:''}
+      </div>`;
+    return;
+  }
+  const s=sums(m);
+  const noSal=!m.salary;
+  const base=noSal? Math.max(1,s.closed+s.pending) : m.salary;
+  const pct=x=> Math.max(0,Math.min(100,x/base*100));
+  const open=m.items.filter(i=>i.status==='planned'||i.status==='carried_in');
+  const done=m.items.filter(i=>i.status==='closed');
+  const drop=m.items.filter(i=>i.status==='dropped');
+  const chronic=chronicCarries();
+
+  view.innerHTML=`
+    <div class="hero">
+      <div class="lbl">${noSal?'Committed this month':'Free to spend'}</div>
+      <div class="big num" style="color:${noSal?'var(--amber)':(s.free<0?'var(--red)':'var(--mint)')}">${fmt(noSal? s.closed+s.pending : s.free)}</div>
+      <div class="segbar">
+        <div style="width:${pct(s.closed)}%;background:var(--dim)"></div>
+        <div style="width:${pct(s.pending)}%;background:var(--amber)"></div>
+        <div style="width:${pct(Math.max(0,s.free))}%;background:var(--mint)"></div>
+      </div>
+      <div class="seg-legend">
+        <span><i class="dot" style="background:var(--dim)"></i>Paid ${fmt(s.closed)}</span>
+        <span><i class="dot" style="background:var(--amber)"></i>To pay ${fmt(s.pending)}</span>
+        <span><i class="dot" style="background:var(--mint)"></i>Free</span>
+      </div>
+    </div>
+    <div class="statrow">
+      <div class="stat"><div class="k">Salary</div><div class="v num">${noSal?'—':fmt(m.salary)}</div></div>
+      <div class="stat"><div class="k">Items open</div><div class="v num">${open.length}</div></div>
+      <div class="stat"><div class="k">Closed</div><div class="v num">${done.length}</div></div>
+    </div>
+    ${noSal?`<div class="section"><button class="btn warn-b" onclick="salarySheet()">Salary credited? Set it → see free balance</button></div>`:''}
+    ${chronic.length?`<div class="section"><div class="warn">⚠️ <div><b>${chronic.map(c=>esc(c.name)).join(', ')}</b> carried ${chronic[0].carryCount}+ months in a row. Commit or drop it.</div></div></div>`:''}
+    ${section('To do',open,true)}
+    ${section('Closed',done,false)}
+    ${drop.length?section('Dropped',drop,false):''}
+    <div style="height:20px"></div>`;
+}
+function section(title,items,openable){
+  const rows=items.length? items.map(it=>{
+    const isDone=it.status==='closed';
+    const tag= it.status==='carried_in'? `<span class="tag carry">carry ×${it.carryCount}</span>`
+      : it.type==='fixed'? '<span class="tag fixed">fixed</span>'
+      : it.type==='onetime'? '<span class="tag once">once</span>' : '<span class="tag vari">var</span>';
+    const icon=isDone
+      ? `<div class="ic" style="background:var(--mint-dim);color:var(--mint)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></div>`
+      : it.status==='dropped'
+      ? `<div class="ic" style="background:var(--red-dim);color:var(--red)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>`
+      : `<div class="ic" style="background:var(--surface2);color:var(--muted)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/></svg></div>`;
+    const amt= isDone
+      ? `<div class="amt num">${fmt(it.actual!=null?it.actual:it.budget)}${it.actual!=null&&it.actual!==it.budget?`<span class="was">${fmt(it.budget)}</span>`:''}</div>`
+      : `<div class="amt num">${fmt(it.budget)}</div>`;
+    return `<button class="item ${isDone?'done':''}" onclick="itemSheet('${it.id}')">
+      ${icon}<div class="mid"><div class="nm">${esc(it.name)}</div><div class="sub">${tag}</div></div>${amt}</button>`;
+  }).join('') : `<div class="empty">Nothing here</div>`;
+  return `<div class="section"><h2>${title}<span class="cnt">${items.length}</span></h2><div class="card">${rows}</div></div>`;
+}
+
+function firstSetup(){ addFirstItem(); }
+function addFirstItem(){ tab='month'; if(!monthData(activeMonth)){ // create shell month so add works, salary asked later
+    openSheet(`
+    <div class="sh-title">Your monthly list</div>
+    <div class="sh-sub">Add items one by one. When salary comes, hit Start.</div>
+    <div class="field"><label>Name</label><input id="f_nm" placeholder="e.g. Electricity"></div>
+    <div class="field"><label>Budget (₹)</label><input id="f_amt" type="number" inputmode="numeric"></div>
+    <div class="field"><label>Type</label>
+      <div class="chips">
+        <button class="chip" data-t="fixed" onclick="pick(this)">Fixed</button>
+        <button class="chip on" data-t="variable" onclick="pick(this)">Variable</button>
+      </div></div>
+    <div class="sheet-actions">
+      <button class="btn primary" onclick="tplAdd(true)">Add & next</button>
+      <button class="btn ghost" onclick="closeSheet();render()">Done</button>
+    </div>`); pickedType='variable'; document.getElementById('f_nm').focus(); }
+}
+function tplAdd(again){
+  const nm=document.getElementById('f_nm').value.trim(); const amt=parseFloat(document.getElementById('f_amt').value);
+  if(!nm||isNaN(amt)||amt<=0){ toast('Name & amount needed'); return; }
+  S.templates.push({id:uid(),name:nm,type:pickedType,budget:amt,active:true}); save();
+  toast(nm+' saved'); 
+  if(again){ document.getElementById('f_nm').value=''; document.getElementById('f_amt').value=''; document.getElementById('f_nm').focus(); }
+  else { closeSheet(); render(); }
+}
+
+/* ---------- predict ---------- */
+function renderPredict(){
+  const nk=nextKey(activeMonth);
+  const fixed=S.templates.filter(t=>t.active&&t.type==='fixed');
+  const vari=S.templates.filter(t=>t.active&&t.type==='variable');
+  const tplNames=new Set(S.templates.filter(t=>t.active).map(t=>t.name.toLowerCase()));
+  const extraCarries=carryCandidates().filter(c=>!tplNames.has(c.name.toLowerCase()));
+  const fSum=fixed.reduce((a,t)=>a+t.budget,0);
+  let vSum=0; const vRows=vari.map(t=>{ const p=predictAmount(t); vSum+=p.amt; return {t,p}; });
+  const cSum=extraCarries.reduce((a,i)=>a+i.budget,0);
+  const total=fSum+vSum+cSum;
+  const sal=S.settings.salaryDefault||0;
+  const free=sal-total;
+  const overs=overrunTemplates();
+  const aoaiOk=S.settings.aoai.endpoint&&S.settings.aoai.key&&S.settings.aoai.deployment;
+
+  view.innerHTML=`
+    <div class="section" style="padding-top:8px">
+      <div class="pcard">
+        <div class="t">Forecast · ${label(nk)}</div>
+        <div class="prow"><span class="l">Fixed commitments (${fixed.length})</span><span class="r num">${fmt(fSum)}</span></div>
+        <div class="prow"><span class="l">Variable (predicted)</span><span class="r num">${fmt(vSum)}</span></div>
+        <div class="prow"><span class="l">Carry-forwards (${extraCarries.length})</span><span class="r num" style="color:${cSum?'var(--amber)':'inherit'}">${fmt(cSum)}</span></div>
+        <div class="prow total"><span class="l">Total commitments</span><span class="r num">${fmt(total)}</span></div>
+        <div class="prow"><span class="l">Expected salary</span><span class="r num">${fmt(sal)}</span></div>
+        <div class="prow total"><span class="l">Predicted free balance</span><span class="r num" style="color:${free<0?'var(--red)':'var(--mint)'}">${fmt(free)}</span></div>
+      </div>
+      ${free<0?`<div class="warn red">🔻 <div>${label(nk)} is over-committed by <b>${fmt(-free)}</b>. Drop or defer something now, not mid-month.</div></div>`:''}
+      ${cSum?`<div class="warn">⏳ <div><b>${fmt(cSum)}</b> of pending items will roll into ${label(nk)}: ${extraCarries.map(c=>esc(c.name)).join(', ')}</div></div>`:''}
+      ${overs.map(o=>`<div class="warn blue">📈 <div><b>${esc(o.name)}</b>: you budget ${fmt(o.budget)} but actually spend ~${fmt(o.avg)}. Prediction uses reality.</div></div>`).join('')}
+      <div class="pcard">
+        <div class="t">Variable breakdown</div>
+        ${vRows.length? vRows.map(({t,p})=>`<div class="prow"><span class="l">${esc(t.name)} <span style="font-size:11px;color:var(--dim)">(${p.how})</span></span><span class="r num">${fmt(p.amt)}</span></div>`).join(''):'<div class="empty">No variable items yet</div>'}
+      </div>
+      <button class="btn ghost" onclick="aiInsight()" ${aoaiOk?'':'disabled style="opacity:.45"'}>
+        ✦ AI insight ${aoaiOk?'':'(configure Azure OpenAI in More)'}
+      </button>
+      <div id="aiBox"></div>
+      <div style="height:20px"></div>
+    </div>`;
+}
+
+async function aiInsight(){
+  const box=document.getElementById('aiBox');
+  box.innerHTML='<div class="ai-out">Thinking…</div>';
+  const a=S.settings.aoai;
+  const hist=Object.keys(S.months).sort().slice(-6).map(k=>{
+    const m=S.months[k]; const s=sums(m);
+    return `${label(k)}: salary ${m.salary}, paid ${s.closed}, pending ${s.pending}, items:[${m.items.map(i=>`${i.name} ${i.status} b${i.budget}${i.actual!=null?' a'+i.actual:''}`).join('; ')}]`;
+  }).join('\n');
+  try{
+    const r=await fetch(`${a.endpoint.replace(/\/$/,'')}/openai/deployments/${a.deployment}/chat/completions?api-version=${a.ver}`,{
+      method:'POST',headers:{'Content-Type':'application/json','api-key':a.key},
+      body:JSON.stringify({messages:[
+        {role:'system',content:'You are a blunt personal budget coach for an Indian middle-class user. Amounts in INR. Reply in under 120 words, plain text, 3-4 sharp observations and 1 action. No fluff.'},
+        {role:'user',content:'My budget history:\n'+hist+'\nGive insight for next month.'}
+      ],max_tokens:300,temperature:0.4})
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    box.innerHTML='<div class="ai-out">'+esc(d.choices[0].message.content)+'</div>';
+  }catch(e){
+    box.innerHTML='<div class="ai-out" style="color:var(--red)">Failed: '+esc(e.message)+'.\nIf this is a CORS block, front your Azure OpenAI via APIM with a CORS policy — browser can\'t call AOAI directly.</div>';
+  }
+}
+
+/* ---------- more ---------- */
+function renderMore(){
+  const keys=Object.keys(S.months).sort().reverse();
+  const nk=nextKey(curKey);
+  const staleBackup = S.settings.lastExport && (Date.now()-S.settings.lastExport > 14*864e5);
+  const neverBackup = !S.settings.lastExport && keys.length>0;
+  view.innerHTML=`
+    <div class="section" style="padding-top:8px">
+      ${(staleBackup||neverBackup)?`<div class="warn red">💾 <div>iPhone Safari can wipe local data after ~7 days of no use. <b>Export a backup now.</b></div></div>`:''}
+      <h2>Actions</h2>
+      <div class="list-plain">
+        ${!monthData(curKey)?`<button class="row-plain" onclick="activeMonth='${curKey}';startSheet('${curKey}')">Start ${label(curKey)}<span class="r">→</span></button>`:''}
+        <button class="row-plain" onclick="dashSheet()">Build dashboard<span class="r">on demand →</span></button>
+        <button class="row-plain" onclick="tplSheet()">Manage recurring items<span class="r">${S.templates.filter(t=>t.active).length} →</span></button>
+        <button class="row-plain" onclick="exportJSON()">Export backup (JSON)<span class="r">${S.settings.lastExport? new Date(S.settings.lastExport).toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'never'} →</span></button>
+        <button class="row-plain" onclick="importSheet()">Import backup / history<span class="r">→</span></button>
+        <button class="row-plain" onclick="uiSheet()">Appearance<span class="r">${S.settings.ui.theme} · ${S.settings.ui.density} →</span></button>
+        <button class="row-plain" onclick="aoaiSheet()">Azure OpenAI settings<span class="r">${S.settings.aoai.endpoint?'✓':'—'} →</span></button>
+      </div>
+      <h2 style="margin-top:20px">Months</h2>
+      <div class="list-plain">
+        ${keys.length? keys.map(k=>{ const s=sums(S.months[k]);
+          return `<button class="row-plain" onclick="activeMonth='${k}';tab='month';render()">${label(k)}${k===activeMonth?' •':''}<span class="r num">${S.months[k].salary? 'free '+fmt(s.free) : 'spent '+fmt(s.closed)}</span></button>`; }).join('')
+        : '<div class="empty">No months yet</div>'}
+      </div>
+      <div class="hint" style="text-align:center;margin-top:16px">Data lives only on this phone. Export regularly.</div>
+      <div style="height:20px"></div>
+    </div>`;
+}
+
+function dashSheet(){
+  const keys=Object.keys(S.months).sort().filter(k=>S.months[k].items.some(i=>i.status==='closed'));
+  if(!keys.length){ toast('No closed data yet'); return; }
+  const sp=keys.map(k=>({k,v:sums(S.months[k]).closed}));
+  const maxSp=Math.max(...sp.map(x=>x.v),1);
+  const rows=sp.map((x,i)=>{
+    const d=i? x.v-sp[i-1].v : 0;
+    const dTxt=i? ((d>=0?'+':'−')+inr.format(Math.abs(Math.round(d/1000)))+'k') : '';
+    return `<div class="bar-wrap">
+      <div class="bar-lbl"><span>${label(x.k)}</span><span class="num">${fmt(x.v)} <span style="color:${d>0?'var(--red)':'var(--mint)'}">${dTxt}</span></span></div>
+      <div class="bar"><i style="width:${x.v/maxSp*100}%;background:var(--mint)"></i></div></div>`;
+  }).join('');
+  const agg={};
+  keys.forEach(k=>S.months[k].items.forEach(i=>{ if(i.status==='closed') agg[i.name]=(agg[i.name]||0)+(i.actual!=null?i.actual:i.budget); }));
+  const tot=Object.values(agg).reduce((a,b)=>a+b,0);
+  const top=Object.entries(agg).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  const hi=sp.reduce((a,b)=>b.v>a.v?b:a);
+  let carryTot=0; keys.forEach(k=>S.months[k].items.forEach(i=>{ if(i.status==='carried_out') carryTot++; }));
+  openSheet(`
+    <div class="sh-title">Dashboard</div>
+    <div class="sh-sub">${keys.length} months · total spent ${fmt(tot)}</div>
+    <div class="pcard" style="margin-bottom:12px"><div class="t">Month-on-month spend</div>${rows}</div>
+    <div class="pcard" style="margin-bottom:12px"><div class="t">Where the money goes (all-time)</div>
+      ${top.map(([n,v])=>`<div class="prow"><span class="l">${esc(n)}</span><span class="r num">${fmt(v)} <span style="font-size:11px;color:var(--dim)">${Math.round(v/tot*100)}%</span></span></div>`).join('')}
+    </div>
+    <div class="pcard"><div class="t">Signals</div>
+      <div class="prow"><span class="l">Avg monthly spend</span><span class="r num">${fmt(tot/keys.length)}</span></div>
+      <div class="prow"><span class="l">Heaviest month</span><span class="r num">${label(hi.k)} · ${fmt(hi.v)}</span></div>
+      <div class="prow"><span class="l">Carry-forward events</span><span class="r num">${carryTot}</span></div>
+    </div>`);
+}
+
+function tplSheet(){
+  const rows=S.templates.map(t=>`
+    <button class="row-plain" onclick="tplToggle('${t.id}')">${esc(t.name)} <span style="font-size:11px;color:var(--dim)">${t.type}</span>
+    <span class="r num">${fmt(t.budget)} ${t.active?'<span style="color:var(--mint)">on</span>':'<span style="color:var(--dim)">off</span>'}</span></button>`).join('');
+  openSheet(`
+    <div class="sh-title">Recurring items</div>
+    <div class="sh-sub">Tap to toggle on/off. Off items won't load next month.</div>
+    <div class="list-plain">${rows||'<div class="empty">None yet</div>'}</div>`);
+}
+function tplToggle(id){ const t=S.templates.find(x=>x.id===id); t.active=!t.active; save(); tplSheet(); }
+
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const u=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=u; a.download='budget-backup-'+curKey+'.json'; a.click(); URL.revokeObjectURL(u);
+  S.settings.lastExport=Date.now(); save(); render(); toast('Backup exported');
+}
+function importSheet(){
+  openSheet(`
+    <div class="sh-title">Import</div>
+    <div class="sh-sub">Pick a backup file from Files/iCloud, or paste JSON below.</div>
+    <div class="field"><input type="file" id="impFile" accept="application/json,.json" style="width:100%;color:var(--muted);font-size:13px"></div>
+    <div class="field"><textarea id="impTxt" rows="5" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;color:var(--ink);font-size:13px;font-family:monospace" placeholder='{"settings":…,"templates":…,"months":…}'></textarea></div>
+    <button class="btn primary" onclick="doImport()">Import (replaces current data)</button>`);
+  document.getElementById('impFile').onchange=e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader(); r.onload=()=>{ document.getElementById('impTxt').value=r.result; doImport(); }; r.readAsText(f);
+  };
+}
+function doImport(){
+  try{
+    const d=JSON.parse(document.getElementById('impTxt').value);
+    if(!d.months||!d.templates) throw new Error('wrong shape');
+    S=d; if(!S.settings) S.settings={salaryDefault:null,lastExport:null,aoai:{endpoint:'',key:'',deployment:'',ver:'2024-06-01'}};
+    if(!S.settings.ui) S.settings.ui={theme:'mint',density:'comfortable'};
+    applyUI();
+    save(); activeMonth=Object.keys(S.months).sort().pop()||curKey;
+    closeSheet(); tab='month'; render(); toast('Imported ✓');
+  }catch(e){ toast('Invalid JSON'); }
+}
+function aoaiSheet(){
+  const a=S.settings.aoai;
+  openSheet(`
+    <div class="sh-title">Azure OpenAI</div>
+    <div class="sh-sub">Used only for the AI insight card. Key stays on this phone.</div>
+    <div class="field"><label>Endpoint</label><input id="ao_e" value="${esc(a.endpoint)}" placeholder="https://xxx.openai.azure.com"></div>
+    <div class="field"><label>Deployment name</label><input id="ao_d" value="${esc(a.deployment)}" placeholder="gpt-4o-mini"></div>
+    <div class="field"><label>API key</label><input id="ao_k" value="${esc(a.key)}" type="password"></div>
+    <div class="field"><label>API version</label><input id="ao_v" value="${esc(a.ver)}"></div>
+    <div class="hint">Browser → AOAI direct calls usually hit CORS. Best: expose it via your APIM with a CORS policy and put the APIM URL here.</div>
+    <button class="btn primary" onclick="aoaiSave()">Save</button>`);
+}
+function aoaiSave(){
+  S.settings.aoai={endpoint:document.getElementById('ao_e').value.trim(),deployment:document.getElementById('ao_d').value.trim(),key:document.getElementById('ao_k').value.trim(),ver:document.getElementById('ao_v').value.trim()||'2024-06-01'};
+  save(); closeSheet(); render(); toast('Saved');
+}
+
+/* ================= appearance ================= */
+const THEMES=[['mint','Mint'],['oled','OLED'],['ocean','Ocean'],['light','Light']];
+const TC={mint:'#0B0F0C',oled:'#000000',ocean:'#0A0F1A',light:'#F3F5F2'};
+function applyUI(){
+  const u=(S.settings&&S.settings.ui)||{theme:'mint',density:'comfortable'};
+  document.body.dataset.theme=u.theme;
+  document.body.dataset.compact=u.density==='compact'?'1':'0';
+  const m=document.querySelector('meta[name="theme-color"]'); if(m) m.content=TC[u.theme]||'#0B0F0C';
+}
+function uiSheet(){
+  const u=S.settings.ui;
+  openSheet(`
+    <div class="sh-title">Appearance</div>
+    <div class="sh-sub">Applies instantly, saved on this phone.</div>
+    <div class="field"><label>Theme</label>
+      <div class="chips">${THEMES.map(([k,n])=>`<button class="chip ${u.theme===k?'on':''}" onclick="setUI('theme','${k}')">${n}</button>`).join('')}</div></div>
+    <div class="field"><label>Density</label>
+      <div class="chips">
+        <button class="chip ${u.density==='comfortable'?'on':''}" onclick="setUI('density','comfortable')">Comfortable</button>
+        <button class="chip ${u.density==='compact'?'on':''}" onclick="setUI('density','compact')">Compact</button>
+      </div></div>`);
+}
+function setUI(k,v){ S.settings.ui[k]=v; save(); applyUI(); uiSheet(); render(); }
+
+/* ================= wire ================= */
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{ tab=b.dataset.tab; render(); });
+document.getElementById('fab').onclick=addSheet;
+applyUI();
+render();
+</script>
+</body>
+</html>
