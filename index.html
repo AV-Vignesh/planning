@@ -60,7 +60,14 @@ input,select{font-family:inherit;font-size:16px}
 /* ---------- header ---------- */
 header{padding:calc(14px + var(--safe-t)) 18px 6px;display:flex;justify-content:space-between;align-items:center}
 header h1{font-size:15px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
-#monthPill{font-size:13px;font-weight:600;background:var(--surface);border:1px solid var(--border);padding:6px 12px;border-radius:99px;color:var(--ink)}
+#monthPill{font-size:13px;font-weight:600;background:var(--surface);border:1px solid var(--border);padding:8px 14px;border-radius:99px;color:var(--ink);display:flex;align-items:center;gap:6px;min-height:36px}
+#monthPill svg{width:12px;height:12px;opacity:.6}
+.mnav{display:flex;align-items:center;gap:4px}
+.mnav .ar{width:36px;height:36px;border-radius:99px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:20px;line-height:1}
+.mnav .ar:disabled{opacity:.25}
+.mnav .ar:active{background:var(--surface)}
+.plan-badge{font-size:10px;font-weight:600;color:var(--blue);background:rgba(125,184,240,.12);padding:2px 7px;border-radius:99px}
+.row-plain.sel{background:var(--mint-dim)}
 
 /* ---------- hero balance ---------- */
 .hero{padding:10px 18px 4px}
@@ -152,6 +159,9 @@ nav svg{width:22px;height:22px}
 .prow .l{color:var(--muted)}
 .prow .r{font-weight:600}
 .prow.total .l,.prow.total .r{color:var(--ink);font-size:15px;font-weight:700}
+.prow.head{font-size:11px;color:var(--dim);padding:0 0 6px;text-transform:uppercase;letter-spacing:.05em}
+.prow.head .r{font-weight:500;color:var(--dim)}
+.mcol{display:inline-block;min-width:88px;text-align:right}
 .bar-wrap{margin:9px 0}
 .bar-lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px}
 .bar{height:9px;border-radius:99px;background:var(--surface2);overflow:hidden;display:flex}
@@ -172,7 +182,11 @@ nav svg{width:22px;height:22px}
 
 <header>
   <h1 id="appTitle">Budget Pilot</h1>
-  <button id="monthPill"></button>
+  <div class="mnav">
+    <button class="ar" id="mPrev" aria-label="Previous month">‹</button>
+    <button id="monthPill" aria-label="Choose month"></button>
+    <button class="ar" id="mNext" aria-label="Next month">›</button>
+  </div>
 </header>
 
 <main id="view"></main>
@@ -203,11 +217,20 @@ nav svg{width:22px;height:22px}
 <script>
 /* ================= state ================= */
 const KEY='budgetpilot_v2';
+const DEF_AOAI={endpoint:'',key:'',deployment:'',ver:'2024-06-01'};
 let S = load();
+function normalize(d){
+  if(!d.settings) d.settings={salaryDefault:null,lastExport:null};
+  if(!d.settings.ui) d.settings.ui={theme:'mint',density:'comfortable'};
+  if(!d.settings.aoai) d.settings.aoai={...DEF_AOAI};
+  if(!d.settings.horizon) d.settings.horizon=3;
+  if(!d.plans) d.plans={};          // one-time items planned for future months: {'2026-11':[{id,name,budget}]}
+  return d;
+}
 function load(){
   try{ const d=JSON.parse(localStorage.getItem(KEY));
-    if(d&&d.months){ if(!d.settings.ui) d.settings.ui={theme:'mint',density:'comfortable'}; return d; } }catch(e){}
-  return { settings:{salaryDefault:null,lastExport:null,ui:{theme:'mint',density:'comfortable'},aoai:{endpoint:'',key:'',deployment:'',ver:'2024-06-01'}}, templates:[], months:{} };
+    if(d&&d.months) return normalize(d); }catch(e){}
+  return normalize({ settings:{salaryDefault:null,lastExport:null}, templates:[], months:{} });
 }
 function save(){ localStorage.setItem(KEY,JSON.stringify(S)); }
 const uid=()=>Math.random().toString(36).slice(2,9);
@@ -220,14 +243,15 @@ function nextKey(k){ let[y,m]=k.split('-').map(Number); m++; if(m>12){m=1;y++;} 
 function prevKey(k){ let[y,m]=k.split('-').map(Number); m--; if(m<1){m=12;y--;} return y+'-'+String(m).padStart(2,'0'); }
 const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function label(k){ const[y,m]=k.split('-'); return MN[+m-1]+' '+y; }
+function latestKey(){ return Object.keys(S.months).sort().pop()||null; }
 
 /* ================= money ================= */
 const inr=new Intl.NumberFormat('en-IN',{maximumFractionDigits:0});
-const fmt=n=>'₹'+inr.format(Math.round(n||0));
+const fmt=n=>(n<0?'−':'')+'₹'+inr.format(Math.abs(Math.round(n||0)));
 
 /* ================= view state ================= */
 let tab='month';
-let activeMonth = S.months[curKey] ? curKey : (Object.keys(S.months).sort().pop() || curKey);
+let activeMonth = (latestKey() && latestKey()>=curKey) ? latestKey() : curKey;
 
 /* ================= core calcs ================= */
 function monthData(k){ return S.months[k]; }
@@ -273,6 +297,62 @@ function overrunTemplates(){
   return out;
 }
 
+/* ================= multi-month forecast ================= */
+// First forecast month = the month after the latest started month,
+// but never earlier than the current calendar month.
+function forecastStart(){
+  const lk=latestKey();
+  if(!lk) return curKey;
+  const n=nextKey(lk);
+  return n>curKey ? n : curKey;
+}
+// What a not-yet-started month will look like, mirroring startMonth()
+function projectMonth(k){
+  const items=[];
+  if(k===forecastStart()){
+    const lk=latestKey();
+    if(lk) S.months[lk].items.forEach(it=>{
+      if(it.status==='planned'||it.status==='carried_in')
+        items.push({name:it.name,type:it.type,amt:it.budget,src:'carry',n:(it.carryCount||0)+1});
+    });
+  }
+  S.templates.filter(t=>t.active).forEach(t=>{
+    if(!items.some(x=>x.name.toLowerCase()===t.name.toLowerCase())){
+      const p=predictAmount(t); items.push({name:t.name,type:t.type,amt:p.amt,how:p.how,src:'tpl'});
+    }
+  });
+  (S.plans[k]||[]).forEach(p=>items.push({id:p.id,name:p.name,type:'onetime',amt:p.budget,src:'plan'}));
+  return items;
+}
+function isPlannable(k){ return !S.months[k] && k>=forecastStart(); }
+function monthRange(){
+  const started=Object.keys(S.months).sort();
+  const first=(started[0]&&started[0]<curKey)?started[0]:curKey;
+  let end=forecastStart(); for(let i=0;i<11;i++) end=nextKey(end);
+  const ks=[]; for(let k=first;k<=end;k=nextKey(k)) ks.push(k);
+  return ks;
+}
+function goMonth(k){ activeMonth=k; tab='month'; closeSheet(); render(); }
+function forecast(n){
+  const start=forecastStart();
+  const sal=S.settings.salaryDefault||0;
+  const months=[]; let k=start, cum=0;
+  for(let i=0;i<n;i++){
+    const items=projectMonth(k);
+    const sumOf=f=>items.filter(f).reduce((a,x)=>a+x.amt,0);
+    const total=sumOf(()=>true);
+    const free=sal-total; cum+=free;
+    months.push({k,items,total,free,cum,
+      carry:sumOf(x=>x.src==='carry'), plan:sumOf(x=>x.src==='plan'),
+      fixed:sumOf(x=>x.src==='tpl'&&x.type==='fixed'), vari:sumOf(x=>x.src==='tpl'&&x.type==='variable')});
+    k=nextKey(k);
+  }
+  const vRows=S.templates.filter(t=>t.active&&t.type==='variable').map(t=>({t,p:predictAmount(t)}));
+  const carries=months[0].items.filter(x=>x.src==='carry');
+  return {start,lk:latestKey(),sal,months,vRows,carries,hasTpl:S.templates.some(t=>t.active)};
+}
+function setHorizon(n){ S.settings.horizon=n; save(); render(); }
+
 /* ================= actions ================= */
 function startMonth(k,salary){
   const items=[];
@@ -292,7 +372,8 @@ function startMonth(k,salary){
       items.push({id:uid(),name:t.name,type:t.type,budget:t.budget,actual:null,status:'planned',carryCount:0,tid:t.id});
   });
   // pre-added one-times for this month
-  if(S.months[k] && S.months[k].preItems){ S.months[k].preItems.forEach(p=>items.push(p)); }
+  (S.plans[k]||[]).forEach(p=>items.push({id:uid(),name:p.name,type:'onetime',budget:p.budget,actual:null,status:'planned',carryCount:0}));
+  delete S.plans[k];
   S.months[k]={salary:salary,items:items,startedAt:Date.now()};
   S.settings.salaryDefault=salary;
   activeMonth=k; save(); render();
@@ -347,19 +428,20 @@ function doDelete(id){ const m=monthData(activeMonth); m.items=m.items.filter(x=
 /* ---- add / edit ---- */
 let pickedType='variable';
 function addSheet(){
-  pickedType='variable';
+  const planMode=!monthData(activeMonth);
+  pickedType=planMode?'onetime':'variable';
   openSheet(`
-    <div class="sh-title">Add item</div>
-    <div class="sh-sub">Goes into ${label(activeMonth)}</div>
+    <div class="sh-title">${planMode?'Plan an expense':'Add item'}</div>
+    <div class="sh-sub">${planMode?'For '+label(activeMonth)+' · loads automatically when you start that month':'Goes into '+label(activeMonth)}</div>
     <div class="field"><label>Name</label><input id="f_nm" placeholder="e.g. Groceries" autocomplete="off"></div>
     <div class="field"><label>Budget amount</label><input id="f_amt" type="number" inputmode="numeric" placeholder="0"></div>
     <div class="field"><label>Type</label>
       <div class="chips">
         <button class="chip" data-t="fixed" onclick="pick(this)">Fixed</button>
-        <button class="chip on" data-t="variable" onclick="pick(this)">Variable</button>
-        <button class="chip" data-t="onetime" onclick="pick(this)">One-time</button>
+        <button class="chip ${planMode?'':'on'}" data-t="variable" onclick="pick(this)">Variable</button>
+        <button class="chip ${planMode?'on':''}" data-t="onetime" onclick="pick(this)">One-time</button>
       </div>
-      <div class="hint">Fixed & Variable repeat every month (saved as template). One-time is just for this month.</div>
+      <div class="hint">Fixed & Variable repeat every month (saved as template). One-time is just for ${label(activeMonth)}.</div>
     </div>
     <button class="btn primary" onclick="doAdd()">Add</button>
   `);
@@ -370,7 +452,14 @@ function doAdd(){
   const nm=document.getElementById('f_nm').value.trim(); const amt=parseFloat(document.getElementById('f_amt').value);
   if(!nm||isNaN(amt)||amt<=0){ toast('Name & amount needed'); return; }
   let m=monthData(activeMonth);
-  if(!m){ toast('Start the month first'); closeSheet(); return; }
+  if(!m){
+    if(!isPlannable(activeMonth)){ toast('Start the month first'); closeSheet(); return; }
+    if(pickedType==='onetime') (S.plans[activeMonth]=S.plans[activeMonth]||[]).push({id:uid(),name:nm,budget:amt});
+    else S.templates.push({id:uid(),name:nm,type:pickedType,budget:amt,active:true});
+    save(); closeSheet(); render();
+    toast(pickedType==='onetime'? nm+' planned for '+label(activeMonth) : nm+' added as recurring');
+    return;
+  }
   const it={id:uid(),name:nm,type:pickedType,budget:amt,actual:null,status:'planned',carryCount:0};
   if(pickedType!=='onetime'){ const t={id:uid(),name:nm,type:pickedType,budget:amt,active:true}; S.templates.push(t); it.tid=t.id; }
   m.items.push(it); save(); closeSheet(); render(); toast(nm+' added');
@@ -405,7 +494,7 @@ function doSalary(){
   const v=parseFloat(document.getElementById('salX').value);
   if(isNaN(v)||v<=0){ toast('Enter amount'); return; }
   monthData(activeMonth).salary=v;
-  const latest=Object.keys(S.months).sort().pop();
+  const latest=latestKey();
   if(activeMonth===latest) S.settings.salaryDefault=v;
   save(); closeSheet(); render(); toast('Salary set · '+fmt(v));
 }
@@ -434,9 +523,14 @@ const view=document.getElementById('view');
 function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function render(){
-  document.getElementById('monthPill').textContent=label(activeMonth);
+  const rng=monthRange(), idx=rng.indexOf(activeMonth);
+  const plan=!S.months[activeMonth]&&activeMonth>curKey;
+  document.getElementById('monthPill').innerHTML=label(activeMonth)+(plan?' <span class="plan-badge">plan</span>':'')+
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>';
+  document.getElementById('mPrev').disabled=idx<=0;
+  document.getElementById('mNext').disabled=idx<0||idx>=rng.length-1;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
-  document.getElementById('fab').style.display=(tab==='month'&&monthData(activeMonth))?'flex':'none';
+  document.getElementById('fab').style.display=(tab==='month'&&(monthData(activeMonth)||isPlannable(activeMonth)))?'flex':'none';
   if(tab==='month') renderMonth();
   else if(tab==='predict') renderPredict();
   else renderMore();
@@ -445,6 +539,7 @@ function render(){
 
 function renderMonth(){
   const m=monthData(activeMonth);
+  if(!m && isPlannable(activeMonth) && (S.templates.length||Object.keys(S.months).length)){ renderPlan(activeMonth); return; }
   if(!m){
     const hasTpl=S.templates.length>0;
     view.innerHTML=`
@@ -546,44 +641,154 @@ function tplAdd(again){
 
 /* ---------- predict ---------- */
 function renderPredict(){
-  const nk=nextKey(activeMonth);
-  const fixed=S.templates.filter(t=>t.active&&t.type==='fixed');
-  const vari=S.templates.filter(t=>t.active&&t.type==='variable');
-  const tplNames=new Set(S.templates.filter(t=>t.active).map(t=>t.name.toLowerCase()));
-  const extraCarries=carryCandidates().filter(c=>!tplNames.has(c.name.toLowerCase()));
-  const fSum=fixed.reduce((a,t)=>a+t.budget,0);
-  let vSum=0; const vRows=vari.map(t=>{ const p=predictAmount(t); vSum+=p.amt; return {t,p}; });
-  const cSum=extraCarries.reduce((a,i)=>a+i.budget,0);
-  const total=fSum+vSum+cSum;
-  const sal=S.settings.salaryDefault||0;
-  const free=sal-total;
+  const H=S.settings.horizon||3;
+  const F=forecast(H);
+  const first=F.months[0], last=F.months[F.months.length-1];
+  const totCommit=F.months.reduce((a,x)=>a+x.total,0);
+  const bad=F.months.filter(x=>x.free<0);
   const overs=overrunTemplates();
   const aoaiOk=S.settings.aoai.endpoint&&S.settings.aoai.key&&S.settings.aoai.deployment;
 
   view.innerHTML=`
     <div class="section" style="padding-top:8px">
-      <div class="pcard">
-        <div class="t">Forecast · ${label(nk)}</div>
-        <div class="prow"><span class="l">Fixed commitments (${fixed.length})</span><span class="r num">${fmt(fSum)}</span></div>
-        <div class="prow"><span class="l">Variable (predicted)</span><span class="r num">${fmt(vSum)}</span></div>
-        <div class="prow"><span class="l">Carry-forwards (${extraCarries.length})</span><span class="r num" style="color:${cSum?'var(--amber)':'inherit'}">${fmt(cSum)}</span></div>
-        <div class="prow total"><span class="l">Total commitments</span><span class="r num">${fmt(total)}</span></div>
-        <div class="prow"><span class="l">Expected salary</span><span class="r num">${fmt(sal)}</span></div>
-        <div class="prow total"><span class="l">Predicted free balance</span><span class="r num" style="color:${free<0?'var(--red)':'var(--mint)'}">${fmt(free)}</span></div>
+      <div class="field" style="margin-bottom:12px"><label>Look ahead</label>
+        <div class="chips">${[3,6,12].map(n=>`<button class="chip ${H===n?'on':''}" onclick="setHorizon(${n})">${n} months</button>`).join('')}</div>
       </div>
-      ${free<0?`<div class="warn red">🔻 <div>${label(nk)} is over-committed by <b>${fmt(-free)}</b>. Drop or defer something now, not mid-month.</div></div>`:''}
-      ${cSum?`<div class="warn">⏳ <div><b>${fmt(cSum)}</b> of pending items will roll into ${label(nk)}: ${extraCarries.map(c=>esc(c.name)).join(', ')}</div></div>`:''}
+      ${!F.hasTpl?`<div class="warn">📝 <div>No recurring items yet. Add them in More → Manage recurring items, or the forecast will be empty.</div></div>`:''}
+      ${!F.sal?`<div class="warn">💰 <div>No salary on record yet. Start a month with your salary so free balance can be forecast.</div></div>`:''}
+
+      <div class="pcard">
+        <div class="t">${label(F.start)} to ${label(last.k)}</div>
+        <div class="prow"><span class="l">Expected salary (${H} × ${fmt(F.sal)})</span><span class="r num">${fmt(F.sal*H)}</span></div>
+        <div class="prow"><span class="l">Total commitments</span><span class="r num">${fmt(totCommit)}</span></div>
+        <div class="prow total"><span class="l">Cumulative free balance</span><span class="r num" style="color:${last.cum<0?'var(--red)':'var(--mint)'}">${fmt(last.cum)}</span></div>
+      </div>
+
+      <div class="pcard">
+        <div class="t">Month by month · tap to plan</div>
+        <div class="prow head"><span>Month</span><span class="r"><span class="mcol">Commitments</span><span class="mcol">Free</span></span></div>
+        ${F.months.map(x=>`<button class="prow" style="width:100%;text-align:left" onclick="goMonth('${x.k}')">
+          <span class="l">${label(x.k)}${x.carry?' <span class="tag carry">+carry</span>':''}${x.plan?' <span class="tag once">+plan</span>':''}</span>
+          <span class="r num"><span class="mcol">${fmt(x.total)}</span><span class="mcol" style="color:${x.free<0?'var(--red)':'var(--mint)'}">${fmt(x.free)}</span></span>
+        </button>`).join('')}
+      </div>
+
+      ${bad.length?`<div class="warn red">🔻 <div>Over-committed in <b>${bad.map(x=>label(x.k)).join(', ')}</b> (worst: ${fmt(Math.min(...bad.map(x=>x.free)))}). Drop or defer something now, not mid-month.</div></div>`:''}
+      ${first.carry?`<div class="warn">⏳ <div><b>${fmt(first.carry)}</b> of pending items from ${label(F.lk)} will roll into ${label(first.k)}: ${F.carries.map(c=>esc(c.name)).join(', ')}</div></div>`:''}
       ${overs.map(o=>`<div class="warn blue">📈 <div><b>${esc(o.name)}</b>: you budget ${fmt(o.budget)} but actually spend ~${fmt(o.avg)}. Prediction uses reality.</div></div>`).join('')}
+
+      <div class="pcard">
+        <div class="t">Breakdown · ${label(first.k)}</div>
+        <div class="prow"><span class="l">Fixed commitments</span><span class="r num">${fmt(first.fixed)}</span></div>
+        <div class="prow"><span class="l">Variable (predicted)</span><span class="r num">${fmt(first.vari)}</span></div>
+        <div class="prow"><span class="l">Carry-forwards</span><span class="r num" style="color:${first.carry?'var(--amber)':'inherit'}">${fmt(first.carry)}</span></div>
+        <div class="prow"><span class="l">Planned one-time</span><span class="r num">${fmt(first.plan)}</span></div>
+      </div>
+
       <div class="pcard">
         <div class="t">Variable breakdown</div>
-        ${vRows.length? vRows.map(({t,p})=>`<div class="prow"><span class="l">${esc(t.name)} <span style="font-size:11px;color:var(--dim)">(${p.how})</span></span><span class="r num">${fmt(p.amt)}</span></div>`).join(''):'<div class="empty">No variable items yet</div>'}
+        ${F.vRows.length? F.vRows.map(({t,p})=>`<div class="prow"><span class="l">${esc(t.name)} <span style="font-size:11px;color:var(--dim)">(${p.how})</span></span><span class="r num">${fmt(p.amt)}</span></div>`).join(''):'<div class="empty">No variable items yet</div>'}
       </div>
+      <div class="hint" style="margin:-4px 0 14px">Future months use your recurring items, the same salary, and any one-time expenses you've planned for them.</div>
+
       <button class="btn ghost" onclick="aiInsight()" ${aoaiOk?'':'disabled style="opacity:.45"'}>
         ✦ AI insight ${aoaiOk?'':'(configure Azure OpenAI in More)'}
       </button>
       <div id="aiBox"></div>
       <div style="height:20px"></div>
     </div>`;
+}
+
+/* ---------- planning view for a future / not-started month ---------- */
+function renderPlan(k){
+  const items=projectMonth(k);
+  const sal=S.settings.salaryDefault||0;
+  const total=items.reduce((a,i)=>a+i.amt,0);
+  const free=sal-total;
+  const fs=forecastStart();
+  const base=Math.max(1,sal||total);
+  const pct=x=>Math.max(0,Math.min(100,x/base*100));
+  const plans=items.filter(i=>i.src==='plan'), carries=items.filter(i=>i.src==='carry'), tpl=items.filter(i=>i.src==='tpl');
+  const planSum=plans.reduce((a,i)=>a+i.amt,0);
+  const startBtn = k===fs
+    ? `<div class="section"><button class="btn primary" onclick="startSheet('${k}')">${k>curKey?'Salary credited early? Start '+label(k):'Salary credited → Start '+label(k)}</button></div>`
+    : `<div class="section"><div class="hint" style="text-align:center">This is a forecast. Start ${label(fs)} first; ${label(k)} can be started after that.</div></div>`;
+  view.innerHTML=`
+    <div class="hero">
+      <div class="lbl">Forecast free · not started</div>
+      <div class="big num" style="color:${free<0?'var(--red)':'var(--mint)'}">${fmt(free)}</div>
+      <div class="segbar">
+        <div style="width:${pct(total)}%;background:var(--amber)"></div>
+        <div style="width:${pct(Math.max(0,free))}%;background:var(--mint)"></div>
+      </div>
+      <div class="seg-legend">
+        <span><i class="dot" style="background:var(--amber)"></i>Committed ${fmt(total)}</span>
+        <span><i class="dot" style="background:var(--mint)"></i>Free</span>
+      </div>
+    </div>
+    <div class="statrow">
+      <div class="stat"><div class="k">Exp. salary</div><div class="v num">${sal?fmt(sal):'—'}</div></div>
+      <div class="stat"><div class="k">Items</div><div class="v num">${items.length}</div></div>
+      <div class="stat"><div class="k">Planned</div><div class="v num">${fmt(planSum)}</div></div>
+    </div>
+    ${free<0?`<div class="section"><div class="warn red">🔻 <div>${label(k)} is over-committed by <b>${fmt(-free)}</b>. Cut or move something before it arrives.</div></div></div>`:''}
+    ${startBtn}
+    <div class="section"><h2>Planned one-time<span class="cnt">${plans.length}</span></h2>
+      <div class="card">${plans.length?plans.map(i=>projRow(i,k)).join(''):'<div class="empty">Tap + to plan a one-time expense for '+label(k)+'</div>'}</div></div>
+    ${carries.length?`<div class="section"><h2>Carrying in<span class="cnt">${carries.length}</span></h2><div class="card">${carries.map(i=>projRow(i,k)).join('')}</div></div>`:''}
+    <div class="section"><h2>Recurring<span class="cnt">${tpl.length}</span></h2>
+      <div class="card">${tpl.length?tpl.map(i=>projRow(i,k)).join(''):'<div class="empty">No recurring items</div>'}</div></div>
+    <div style="height:20px"></div>`;
+}
+function projRow(i,k){
+  const tag= i.src==='carry'?`<span class="tag carry">carry ×${i.n}</span>`
+    : i.src==='plan'?'<span class="tag once">planned</span>'
+    : i.type==='fixed'?'<span class="tag fixed">fixed</span>'
+    : `<span class="tag vari">var</span> <span style="color:var(--dim)">${esc(i.how)}</span>`;
+  const inner=`<div class="ic" style="background:var(--surface2);color:var(--dim)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"><circle cx="12" cy="12" r="8.5"/></svg></div>
+    <div class="mid"><div class="nm">${esc(i.name)}</div><div class="sub">${tag}</div></div><div class="amt num">${fmt(i.amt)}</div>`;
+  return i.src==='plan'? `<button class="item" onclick="planItemSheet('${k}','${i.id}')">${inner}</button>` : `<div class="item">${inner}</div>`;
+}
+function planItemSheet(k,id){
+  const p=(S.plans[k]||[]).find(x=>x.id===id); if(!p) return;
+  openSheet(`
+    <div class="sh-title">${esc(p.name)}</div><div class="sh-sub">Planned for ${label(k)}</div>
+    <div class="field"><label>Name</label><input id="pl_nm" value="${esc(p.name)}"></div>
+    <div class="field"><label>Amount (₹)</label><input id="pl_amt" type="number" inputmode="numeric" value="${p.budget}"></div>
+    <div class="sheet-actions">
+      <button class="btn primary" onclick="planSave('${k}','${id}')">Save</button>
+      <button class="btn danger" onclick="planDelete('${k}','${id}')">Remove</button>
+    </div>`);
+}
+function planSave(k,id){
+  const p=S.plans[k].find(x=>x.id===id);
+  const nm=document.getElementById('pl_nm').value.trim(), amt=parseFloat(document.getElementById('pl_amt').value);
+  if(nm) p.name=nm; if(!isNaN(amt)&&amt>0) p.budget=amt;
+  save(); closeSheet(); render(); toast('Saved');
+}
+function planDelete(k,id){
+  S.plans[k]=S.plans[k].filter(x=>x.id!==id); if(!S.plans[k].length) delete S.plans[k];
+  save(); closeSheet(); render(); toast('Removed');
+}
+
+/* ---------- month picker ---------- */
+function monthPicker(){
+  const rng=monthRange();
+  const sal=S.settings.salaryDefault||0;
+  const row=k=>{
+    let r;
+    if(S.months[k]){ const s=sums(S.months[k]); r=S.months[k].salary?'free '+fmt(s.free):'spent '+fmt(s.closed); }
+    else if(isPlannable(k)){ const t=projectMonth(k).reduce((a,i)=>a+i.amt,0); const n=(S.plans[k]||[]).length;
+      r=`<span style="color:${sal-t<0?'var(--red)':'var(--dim)'}">forecast ${fmt(sal-t)}</span>${n?' <span class="tag once">'+n+' planned</span>':''}`; }
+    else r='<span style="color:var(--dim)">not started</span>';
+    return `<button class="row-plain ${k===activeMonth?'sel':''}" onclick="goMonth('${k}')">${label(k)}<span class="r num">${r}</span></button>`;
+  };
+  const up=rng.filter(k=>k>curKey), past=rng.filter(k=>k<curKey).reverse();
+  openSheet(`
+    <div class="sh-title">Choose month</div><div class="sh-sub">Upcoming months open as a plan you can add to.</div>
+    <div class="section" style="padding:0"><h2>Upcoming</h2><div class="list-plain">${up.map(row).join('')}</div></div>
+    <div class="section" style="padding:14px 0 0"><h2>This month</h2><div class="list-plain">${row(curKey)}</div></div>
+    ${past.length?`<div class="section" style="padding:14px 0 0"><h2>Past</h2><div class="list-plain">${past.map(row).join('')}</div></div>`:''}`);
 }
 
 async function aiInsight(){
@@ -594,12 +799,14 @@ async function aiInsight(){
     const m=S.months[k]; const s=sums(m);
     return `${label(k)}: salary ${m.salary}, paid ${s.closed}, pending ${s.pending}, items:[${m.items.map(i=>`${i.name} ${i.status} b${i.budget}${i.actual!=null?' a'+i.actual:''}`).join('; ')}]`;
   }).join('\n');
+  const F=forecast(S.settings.horizon||3);
+  const fc=F.months.map(x=>`${label(x.k)}: commitments ${Math.round(x.total)}, free ${Math.round(x.free)}`).join('\n');
   try{
     const r=await fetch(`${a.endpoint.replace(/\/$/,'')}/openai/deployments/${a.deployment}/chat/completions?api-version=${a.ver}`,{
       method:'POST',headers:{'Content-Type':'application/json','api-key':a.key},
       body:JSON.stringify({messages:[
         {role:'system',content:'You are a blunt personal budget coach for an Indian middle-class user. Amounts in INR. Reply in under 120 words, plain text, 3-4 sharp observations and 1 action. No fluff.'},
-        {role:'user',content:'My budget history:\n'+hist+'\nGive insight for next month.'}
+        {role:'user',content:'My budget history:\n'+hist+'\n\nForecast:\n'+fc+'\n\nGive insight for the coming months.'}
       ],max_tokens:300,temperature:0.4})
     });
     if(!r.ok) throw new Error('HTTP '+r.status);
@@ -613,7 +820,6 @@ async function aiInsight(){
 /* ---------- more ---------- */
 function renderMore(){
   const keys=Object.keys(S.months).sort().reverse();
-  const nk=nextKey(curKey);
   const staleBackup = S.settings.lastExport && (Date.now()-S.settings.lastExport > 14*864e5);
   const neverBackup = !S.settings.lastExport && keys.length>0;
   view.innerHTML=`
@@ -684,10 +890,13 @@ function tplSheet(){
 function tplToggle(id){ const t=S.templates.find(x=>x.id===id); t.active=!t.active; save(); tplSheet(); }
 
 function exportJSON(){
-  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  // API key is stripped from backups so the file is safe to keep in iCloud/Files/any synced folder
+  const out=JSON.parse(JSON.stringify(S));
+  if(out.settings&&out.settings.aoai) out.settings.aoai.key='';
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
   const u=URL.createObjectURL(blob); const a=document.createElement('a');
   a.href=u; a.download='budget-backup-'+curKey+'.json'; a.click(); URL.revokeObjectURL(u);
-  S.settings.lastExport=Date.now(); save(); render(); toast('Backup exported');
+  S.settings.lastExport=Date.now(); save(); render(); toast('Backup exported (API key excluded)');
 }
 function importSheet(){
   openSheet(`
@@ -705,10 +914,11 @@ function doImport(){
   try{
     const d=JSON.parse(document.getElementById('impTxt').value);
     if(!d.months||!d.templates) throw new Error('wrong shape');
-    S=d; if(!S.settings) S.settings={salaryDefault:null,lastExport:null,aoai:{endpoint:'',key:'',deployment:'',ver:'2024-06-01'}};
-    if(!S.settings.ui) S.settings.ui={theme:'mint',density:'comfortable'};
+    const oldKey=S.settings&&S.settings.aoai&&S.settings.aoai.key;
+    S=normalize(d);
+    if(!S.settings.aoai.key && oldKey) S.settings.aoai.key=oldKey; // keep the key already on this phone
     applyUI();
-    save(); activeMonth=Object.keys(S.months).sort().pop()||curKey;
+    save(); activeMonth=latestKey()||curKey;
     closeSheet(); tab='month'; render(); toast('Imported ✓');
   }catch(e){ toast('Invalid JSON'); }
 }
@@ -716,7 +926,7 @@ function aoaiSheet(){
   const a=S.settings.aoai;
   openSheet(`
     <div class="sh-title">Azure OpenAI</div>
-    <div class="sh-sub">Used only for the AI insight card. Key stays on this phone.</div>
+    <div class="sh-sub">Used only for the AI insight card. Key stays on this phone and is never included in backups.</div>
     <div class="field"><label>Endpoint</label><input id="ao_e" value="${esc(a.endpoint)}" placeholder="https://xxx.openai.azure.com"></div>
     <div class="field"><label>Deployment name</label><input id="ao_d" value="${esc(a.deployment)}" placeholder="gpt-4o-mini"></div>
     <div class="field"><label>API key</label><input id="ao_k" value="${esc(a.key)}" type="password"></div>
@@ -756,6 +966,10 @@ function setUI(k,v){ S.settings.ui[k]=v; save(); applyUI(); uiSheet(); render();
 /* ================= wire ================= */
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{ tab=b.dataset.tab; render(); });
 document.getElementById('fab').onclick=addSheet;
+document.getElementById('monthPill').onclick=monthPicker;
+function stepMonth(d){ const r=monthRange(); const i=r.indexOf(activeMonth); const j=i+d; if(j>=0&&j<r.length){ activeMonth=r[j]; if(tab!=='month') tab='month'; render(); } }
+document.getElementById('mPrev').onclick=()=>stepMonth(-1);
+document.getElementById('mNext').onclick=()=>stepMonth(1);
 applyUI();
 render();
 </script>
