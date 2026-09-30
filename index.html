@@ -83,6 +83,9 @@ header h1{font-size:15px;font-weight:600;color:var(--muted);letter-spacing:.06em
 .stat{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px}
 .stat .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .stat .v{font-size:17px;font-weight:600;margin-top:2px}
+button.stat{text-align:left;font:inherit;color:inherit;transition:background .15s}
+button.stat:active{background:var(--surface2)}
+.stat .k .ed{color:var(--mint);text-transform:none;letter-spacing:0;margin-left:4px}
 
 /* ---------- sections & items ---------- */
 .section{padding:16px 18px 0}
@@ -483,20 +486,27 @@ function doEdit(id){
 
 /* ---- set salary for existing month ---- */
 function salarySheet(){
+  const m=monthData(activeMonth);
+  const cur=m? (m.salary||S.settings.salaryDefault||'') : (S.settings.salaryDefault||'');
   openSheet(`
-    <div class="sh-title">Salary · ${label(activeMonth)}</div><div class="spacer"></div>
-    <div class="field"><label>Amount credited (₹)</label>
-      <input id="salX" type="number" inputmode="numeric" value="${S.settings.salaryDefault||''}" placeholder="e.g. 100000"></div>
+    <div class="sh-title">${m?'Salary':'Expected salary'} · ${label(activeMonth)}</div>
+    <div class="sh-sub">${m?'Change what was credited for this month.':'Used for the forecast of every future month.'}</div>
+    <div class="field"><label>${m?'Amount credited (₹)':'Expected amount (₹)'}</label>
+      <input id="salX" type="number" inputmode="numeric" value="${cur}" placeholder="e.g. 100000"></div>
     <button class="btn primary" onclick="doSalary()">Save</button>`);
   const s=document.getElementById('salX'); s.focus(); s.select();
 }
 function doSalary(){
   const v=parseFloat(document.getElementById('salX').value);
   if(isNaN(v)||v<=0){ toast('Enter amount'); return; }
-  monthData(activeMonth).salary=v;
-  const latest=latestKey();
-  if(activeMonth===latest) S.settings.salaryDefault=v;
-  save(); closeSheet(); render(); toast('Salary set · '+fmt(v));
+  const m=monthData(activeMonth);
+  if(m){
+    m.salary=v;
+    if(activeMonth===latestKey()) S.settings.salaryDefault=v; // latest month drives the forecast
+  } else {
+    S.settings.salaryDefault=v;
+  }
+  save(); closeSheet(); render(); toast((m?'Salary updated · ':'Expected salary · ')+fmt(v));
 }
 
 /* ---- start month sheet ---- */
@@ -582,7 +592,7 @@ function renderMonth(){
       </div>
     </div>
     <div class="statrow">
-      <div class="stat"><div class="k">Salary</div><div class="v num">${noSal?'—':fmt(m.salary)}</div></div>
+      <button class="stat" onclick="salarySheet()"><div class="k">Salary<span class="ed">✎</span></div><div class="v num">${noSal?'—':fmt(m.salary)}</div></button>
       <div class="stat"><div class="k">Items open</div><div class="v num">${open.length}</div></div>
       <div class="stat"><div class="k">Closed</div><div class="v num">${done.length}</div></div>
     </div>
@@ -727,7 +737,7 @@ function renderPlan(k){
       </div>
     </div>
     <div class="statrow">
-      <div class="stat"><div class="k">Exp. salary</div><div class="v num">${sal?fmt(sal):'—'}</div></div>
+      <button class="stat" onclick="salarySheet()"><div class="k">Exp. salary<span class="ed">✎</span></div><div class="v num">${sal?fmt(sal):'—'}</div></button>
       <div class="stat"><div class="k">Items</div><div class="v num">${items.length}</div></div>
       <div class="stat"><div class="k">Planned</div><div class="v num">${fmt(planSum)}</div></div>
     </div>
